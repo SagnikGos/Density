@@ -10,7 +10,7 @@
             <Link href="/" className="mr-6 flex items-center space-x-2">
               {/* You can add a logo or site title here */}
               <span className="font-bold sm:inline-block text-lg font-pt-sans">
-                YourBlog
+                Density
               </span>
             </Link>
             <nav className="flex items-center gap-4 text-sm lg:gap-6">
