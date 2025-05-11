@@ -1,257 +1,317 @@
-// controllers/postController.js
-import Post from '../models/Post.js'; // Ensure this path is correct
-import slugify from 'slugify'; // Make sure you have 'slugify' installed (npm install slugify)
+import Post from '../models/Post.js'; // Your Post model
+import User from '../models/User.js'; // Your User model
+import Comment from '../models/Comment.js'; // Your Comment model
+import mongoose from 'mongoose'; // Import mongoose for ObjectId validation if needed
 
-/**
- * @desc    Create a new blog post
- * @route   POST /api/posts
- * @access  Protected (requires JWT authentication)
- */
+// Helper function to create a slug (you might have this elsewhere)
+const generateSlug = (title) => {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-')        // Replace spaces with hyphens
+    .replace(/-+/g, '-');        // Replace multiple hyphens with single
+};
+
+// Create a new post
 export const createPost = async (req, res) => {
-  const { title, content, tags } = req.body;
-
-  if (!title || !content) {
-    return res.status(400).json({ message: 'Title and content are required.' });
-  }
-
-  // Generate slug from title
-  const slug = slugify(title, { lower: true, strict: true });
-
   try {
-    // req.user should be populated by your verifyJWT middleware
-    // It's expected to have a 'userId' property from the JWT payload
-    if (!req.user || !req.user.userId) {
-      console.error('[Create Post] Error: User ID not found in req.user. JWT might be missing userId or middleware issue.');
-      return res.status(401).json({ message: 'User authentication error, user ID not found.' });
+    const { title, content, tags } = req.body;
+    const authorId = req.user.userId; // Assuming userId is on req.user from verifyJWT
+
+    if (!title || !content) {
+      return res.status(400).json({ message: 'Title and content are required.' });
     }
+
+    const slug = generateSlug(title);
+    // Optionally, check if slug is unique and append a suffix if not
 
     const newPost = new Post({
       title,
       slug,
       content,
-      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(tag => tag.trim()) : []), // Handle tags flexibly
-      authorId: req.user.userId, // Correctly use userId from JWT payload
+      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(tag => tag.trim()) : []),
+      authorId,
+      likes: [],
     });
 
-    const savedPost = await newPost.save();
-    res.status(201).json(savedPost);
+    await newPost.save();
+    // Populate author details for the response
+    const populatedPost = await Post.findById(newPost._id).populate('authorId', 'username name avatar _id').lean();
+    
+    res.status(201).json(populatedPost);
   } catch (err) {
-    console.error('Error in createPost controller:', err);
-    // Check for Mongoose validation error
-    if (err.name === 'ValidationError') {
-      return res.status(400).json({ message: 'Validation Error creating post', error: err.message, details: err.errors });
+    console.error("Error in createPost (backend):", err);
+    if (err.code === 11000) { // Duplicate key error (e.g. for unique slug if you add index)
+        return res.status(409).json({ message: 'A post with this title or slug already exists.' });
     }
-    // Check for duplicate key error (e.g., if slug needs to be unique and isn't)
-    if (err.code === 11000) {
-        return res.status(409).json({ message: 'Conflict: A post with similar unique details (e.g., slug) might already exist.', error: err.message });
-    }
-    res.status(500).json({ message: 'Error creating post', error: err.message });
+    res.status(500).json({ message: 'Failed to create post' });
   }
 };
 
-/**
- * @desc    Update an existing blog post
- * @route   PUT /api/posts/:id
- * @access  Protected
- */
-export const updatePost = async (req, res) => {
-  const { id: postId } = req.params; // Renaming for clarity
-  const { title, content, tags } = req.body;
-
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ message: 'User authentication error, user ID not found.' });
-  }
-
+// Get all posts with author details and comments count
+export const getAllPosts = async (req, res) => {
   try {
-    const post = await Post.findById(postId);
+    const postsWithDetails = await Post.aggregate([
+      {
+        $sort: { createdAt: -1 } // Sort by newest first
+      },
+      {
+        $lookup: { // Join with users collection to get author details
+          from: User.collection.name,
+          localField: 'authorId',
+          foreignField: '_id',
+          as: 'authorInfo'
+        }
+      },
+      {
+        $unwind: { // Deconstruct the authorInfo array
+          path: '$authorInfo',
+          preserveNullAndEmptyArrays: true // Keep posts even if author is somehow missing
+        }
+      },
+      {
+        $lookup: { // Join with comments collection to count comments
+          from: Comment.collection.name,
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'postComments'
+        }
+      },
+      {
+        $addFields: { // Add the commentsCount and structure authorId correctly
+          commentsCount: { $size: '$postComments' },
+          authorId: { // Reconstruct authorId to match frontend expectations
+            _id: '$authorInfo._id',
+            username: '$authorInfo.username',
+            name: '$authorInfo.name',
+            avatar: '$authorInfo.avatar'
+          }
+        }
+      },
+      {
+        $project: { // Select fields to return
+          title: 1,
+          slug: 1,
+          content: 1, // For list view, consider sending a snippet instead of full content
+          tags: 1,
+          authorId: 1, // This is the reconstructed author object
+          likes: 1,
+          commentsCount: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          // postComments: 0, // Optionally remove the full comments array from the response
+        }
+      }
+    ]);
+
+    res.status(200).json(postsWithDetails);
+  } catch (err) {
+    console.error("Error in getAllPosts (backend):", err);
+    res.status(500).json({ message: 'Failed to fetch posts' });
+  }
+};
+
+
+// Get a single post by slug with author details
+export const getPostBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const post = await Post.findOne({ slug })
+                           .populate('authorId', 'username name avatar _id') // Populate author details
+                           .lean(); // Use lean for plain JS object
 
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
+    // Note: commentsCount is not added here by default.
+    // If needed on single post page initially, you'd count comments separately
+    // or adjust the query. The single post page fetches comments separately anyway.
+    res.status(200).json(post);
+  } catch (err) {
+    console.error("Error in getPostBySlug (backend):", err);
+    res.status(500).json({ message: 'Failed to fetch post' });
+  }
+};
 
-    // Check if the logged-in user is the author of the post
-    if (post.authorId.toString() !== req.user.userId) {
+// Update a post by ID
+export const updatePost = async (req, res) => {
+  try {
+    const { id: postId } = req.params;
+    const { title, content, tags } = req.body;
+    const userId = req.user.userId; // From verifyJWT
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+        return res.status(400).json({ message: 'Invalid post ID format.' });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    if (post.authorId.toString() !== userId) {
       return res.status(403).json({ message: 'User not authorized to update this post' });
     }
 
-    // Update fields if they are provided
-    if (title) {
-      post.title = title;
-      post.slug = slugify(title, { lower: true, strict: true });
-    }
-    if (content) {
-      post.content = content;
-    }
-    if (tags !== undefined) { // Allow clearing tags with an empty array or string
+    if (title) post.title = title;
+    if (content) post.content = content;
+    if (title) post.slug = generateSlug(title); // Regenerate slug if title changes
+    if (tags !== undefined) {
         post.tags = Array.isArray(tags) ? tags : (tags ? tags.split(',').map(tag => tag.trim()) : []);
     }
-    // Mongoose `timestamps: true` in schema will automatically update `updatedAt`
+    post.updatedAt = Date.now();
 
     const updatedPost = await post.save();
-    res.status(200).json(updatedPost);
+    const populatedPost = await Post.findById(updatedPost._id).populate('authorId', 'username name avatar _id').lean();
+
+    res.status(200).json(populatedPost);
   } catch (err) {
-    console.error('Error in updatePost controller:', err);
-    if (err.name === 'ValidationError') {
-      return res.status(400).json({ message: 'Validation Error updating post', error: err.message, details: err.errors });
+    console.error("Error in updatePost (backend):", err);
+    if (err.code === 11000) {
+        return res.status(409).json({ message: 'A post with this title or slug already exists.' });
     }
-    if (err.name === 'CastError' && err.kind === 'ObjectId') {
-        return res.status(400).json({ message: 'Invalid post ID format.' });
-    }
-    res.status(500).json({ message: 'Error updating post', error: err.message });
+    res.status(500).json({ message: 'Failed to update post' });
   }
 };
 
-/**
- * @desc    Delete a blog post
- * @route   DELETE /api/posts/:id
- * @access  Protected
- */
+// Delete a post by ID
 export const deletePost = async (req, res) => {
-  const { id: postId } = req.params;
-
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ message: 'User authentication error, user ID not found.' });
-  }
-
   try {
-    const post = await Post.findById(postId);
+    const { id: postId } = req.params;
+    const userId = req.user.userId; // From verifyJWT
 
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+        return res.status(400).json({ message: 'Invalid post ID format.' });
+    }
+
+    const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    if (post.authorId.toString() !== req.user.userId) {
+    if (post.authorId.toString() !== userId) {
       return res.status(403).json({ message: 'User not authorized to delete this post' });
     }
 
-    await post.deleteOne(); // Mongoose v6+ uses deleteOne() on the document
-    res.status(200).json({ message: 'Post deleted successfully' });
+    // Also delete associated comments
+    await Comment.deleteMany({ postId: postId });
+    await Post.findByIdAndDelete(postId);
+
+    res.status(200).json({ message: 'Post and associated comments deleted successfully' });
   } catch (err) {
-    console.error('Error in deletePost controller:', err);
-    if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    console.error("Error in deletePost (backend):", err);
+    res.status(500).json({ message: 'Failed to delete post' });
+  }
+};
+
+// Toggle like on a post
+export const toggleLike = async (req, res) => {
+  try {
+    const { id: postId } = req.params; // This 'id' comes from the route /api/posts/like/:id
+    const userId = req.user.userId; // From verifyJWT, using 'userId' as per your JWT payload
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
         return res.status(400).json({ message: 'Invalid post ID format.' });
     }
-    res.status(500).json({ message: 'Error deleting post', error: err.message });
-  }
-};
-
-/**
- * @desc    Get all blog posts
- * @route   GET /api/posts
- * @access  Public
- */
-export const getAllPosts = async (req, res) => {
-  try {
-    // Consider adding pagination here for production: e.g., req.query.page, req.query.limit
-    const posts = await Post.find()
-      .populate('authorId', 'username avatar name') // Populate author details
-      .sort({ createdAt: -1 }); // Sort by newest first
-    res.status(200).json(posts);
-  } catch (err) {
-    console.error('Error in getAllPosts controller:', err);
-    res.status(500).json({ message: 'Error fetching posts', error: err.message });
-  }
-};
-
-/**
- * @desc    Get a single blog post by its slug
- * @route   GET /api/posts/:slug
- * @access  Public
- */
-export const getPostBySlug = async (req, res) => {
-  try {
-    const post = await Post.findOne({ slug: req.params.slug })
-      .populate('authorId', 'username avatar name'); // Populate author details
-
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+    if (!userId) { // Should be caught by verifyJWT, but as a safeguard
+        return res.status(401).json({ message: 'User not authenticated.' });
     }
-    res.status(200).json(post);
-  } catch (err) {
-    console.error('Error in getPostBySlug controller:', err);
-    res.status(500).json({ message: 'Error fetching post', error: err.message });
-  }
-};
 
-/**
- * @desc    Toggle like/unlike on a post
- * @route   POST /api/posts/like/:id
- * @access  Protected
- */
-export const toggleLike = async (req, res) => {
-  const { id: postId } = req.params;
-
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ message: 'User authentication error, user ID not found.' });
-  }
-  const currentUserId = req.user.userId;
-
-  try {
     const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    // Check if the user has already liked the post
-    const likeIndex = post.likes.findIndex(id => id.toString() === currentUserId);
+    const likeIndex = post.likes.indexOf(userId);
 
-    if (likeIndex > -1) {
-      // User has liked, so unlike
-      post.likes.splice(likeIndex, 1);
+    if (likeIndex === -1) {
+      // User hasn't liked it yet, so add like
+      post.likes.push(userId);
     } else {
-      // User has not liked, so like
-      post.likes.push(currentUserId);
+      // User has liked it, so remove like (unlike)
+      post.likes.splice(likeIndex, 1);
     }
 
-    const updatedPost = await post.save();
-    res.status(200).json({
-      message: likeIndex > -1 ? 'Post unliked successfully' : 'Post liked successfully',
-      likesCount: updatedPost.likes.length,
-      likes: updatedPost.likes // Optionally return the array of likes
-    });
+    await post.save();
+    res.status(200).json({ likes: post.likes }); // Send back the updated likes array
   } catch (err) {
-    console.error('Error in toggleLike controller:', err);
-    if (err.name === 'CastError' && err.kind === 'ObjectId') {
-        return res.status(400).json({ message: 'Invalid post ID format.' });
-    }
-    res.status(500).json({ message: 'Error toggling like on post', error: err.message });
+    console.error("Error in toggleLike (backend):", err);
+    res.status(500).json({ message: 'Failed to toggle like on post' });
   }
 };
 
-/**
- * @desc    Get posts by a specific tag
- * @route   GET /api/posts/tag/:tag
- * @access  Public
- */
+// Get posts by tag
 export const getPostsByTag = async (req, res) => {
-  try {
-    const { tag } = req.params;
-    // Consider case-insensitive tag search if desired: new RegExp(`^${tag}$`, 'i')
-    const posts = await Post.find({ tags: tag })
-      .populate('authorId', 'username avatar name')
-      .sort({ createdAt: -1 });
+    try {
+        const { tag } = req.params;
+        // Similar to getAllPosts, but with an initial $match stage for the tag
+        const postsWithDetailsByTag = await Post.aggregate([
+            {
+                $match: { tags: tag } // Filter by tag
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $lookup: {
+                    from: User.collection.name,
+                    localField: 'authorId',
+                    foreignField: '_id',
+                    as: 'authorInfo'
+                }
+            },
+            {
+                $unwind: { path: '$authorInfo', preserveNullAndEmptyArrays: true }
+            },
+            {
+                $lookup: {
+                    from: Comment.collection.name,
+                    localField: '_id',
+                    foreignField: 'postId',
+                    as: 'postComments'
+                }
+            },
+            {
+                $addFields: {
+                    commentsCount: { $size: '$postComments' },
+                    authorId: {
+                        _id: '$authorInfo._id',
+                        username: '$authorInfo.username',
+                        name: '$authorInfo.name',
+                        avatar: '$authorInfo.avatar'
+                    }
+                }
+            },
+            {
+                $project: {
+                    title: 1, slug: 1, content: 1, tags: 1, authorId: 1,
+                    likes: 1, commentsCount: 1, createdAt: 1, updatedAt: 1,
+                }
+            }
+        ]);
 
-    // It's okay to return an empty array if no posts are found for a tag,
-    // rather than a 404, as it's a valid query with no results.
-    res.status(200).json(posts);
-  } catch (err) {
-    console.error('Error in getPostsByTag controller:', err);
-    res.status(500).json({ message: 'Error fetching posts by tag', error: err.message });
-  }
+        if (!postsWithDetailsByTag || postsWithDetailsByTag.length === 0) {
+            return res.status(200).json([]); // Return empty array if no posts found for the tag
+        }
+        res.status(200).json(postsWithDetailsByTag);
+    } catch (err) {
+        console.error(`Error in getPostsByTag (backend) for tag "${req.params.tag}":`, err);
+        res.status(500).json({ message: 'Failed to fetch posts by tag' });
+    }
 };
 
-/**
- * @desc    Get all unique tags across all posts
- * @route   GET /api/posts/tags
- * @access  Public
- */
+// Get all unique tags with their counts
 export const getAllTags = async (req, res) => {
-  try {
-    // More efficient way to get distinct tags directly from MongoDB
-    const tags = await Post.distinct('tags');
-    res.status(200).json(tags.sort()); // Sort tags alphabetically
-  } catch (err) {
-    console.error('Error in getAllTags controller:', err);
-    res.status(500).json({ message: 'Error fetching tags', error: err.message });
-  }
+    try {
+        const tags = await Post.aggregate([
+            { $unwind: '$tags' }, // Deconstruct the tags array
+            { $group: { _id: '$tags', count: { $sum: 1 } } }, // Group by tag and count occurrences
+            { $sort: { count: -1 } }, // Sort by most frequent
+            { $project: { _id: 0, name: '$_id', count: 1 } } // Rename _id to name for clarity
+        ]);
+        res.status(200).json(tags);
+    } catch (err) {
+        console.error("Error in getAllTags (backend):", err);
+        res.status(500).json({ message: 'Failed to fetch tags' });
+    }
 };

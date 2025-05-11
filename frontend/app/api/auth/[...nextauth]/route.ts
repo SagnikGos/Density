@@ -1,5 +1,5 @@
 // src/app/api/auth/[...nextauth]/route.ts
-import NextAuth, { NextAuthOptions, Profile, Account, User } from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 // Import CredentialsProvider if you still plan to use it

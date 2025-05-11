@@ -177,3 +177,70 @@
     pointer-events: none;
   }
 }
+
+/* Custom Scrollbar for Density Website */
+
+/* For Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(226, 213, 186, 0.5); /* Light beige to match website background */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 108, 76, 0.85); /* Warm brown color */
+  border-radius: 10px;
+  border: 3px solid rgba(226, 213, 186, 0.8); /* Border color matching background */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 92, 64, 1); /* Slightly darker brown on hover */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 108, 76, 0.85) rgba(226, 213, 186, 0.5);
+}
+
+/* Ensure smooth scrolling behavior across the site */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Add a subtle fade effect at the top and bottom of scrollable areas */
+.scrollable-content {
+  position: relative;
+}
+
+.scrollable-content::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to top, rgba(226, 213, 186, 1), rgba(226, 213, 186, 0));
+  pointer-events: none;
+  z-index: 10;
+}
+
+.scrollable-content::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, rgba(226, 213, 186, 1), rgba(226, 213, 186, 0));
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Add subtle brown accent to scrollable areas */
+.scrollable-container {
+  border-right: 1px solid rgba(139, 108, 76, 0.15);
+}
