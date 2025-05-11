@@ -85,6 +85,40 @@ const config = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
     },
+    typography: (theme) => ({
+        DEFAULT: { // Styles for .prose
+          css: {
+            'blockquote': {
+              backgroundColor: `hsl(var(--muted) / 0.4)`, // 40% opacity of muted
+              // other blockquote styles like border, color, etc. can also be set here
+            },
+            'pre': {
+              backgroundColor: `hsl(var(--muted) / 0.15)`, // Example: 15% opacity of muted for a subtle background
+                                                          // Or use a specific color from your theme: theme('colors.neutral.100')
+              // other pre styles
+            },
+            // You can also define link styles here to ensure consistency
+            'a': {
+              color: `hsl(var(--primary))`,
+              // ... other link styles from your global CSS
+            },
+          },
+        },
+        invert: { // Styles for .prose-invert (used with dark:prose-invert)
+          css: {
+            'blockquote': {
+              backgroundColor: `hsl(var(--muted) / 0.5)`, // Ensure --muted is the dark mode version
+            },
+            'pre': {
+              backgroundColor: `hsl(var(--muted) / 0.25)`, // Darker muted for pre in dark mode
+            },
+             'a': {
+              color: `hsl(var(--primary))`, // Ensure --primary is visible in dark mode
+              // ... other link styles
+            },
+          },
+        },
+      }),
   },
   plugins: [
     require("tailwindcss-animate"), // Plugin for animations (used by shadcn/ui)

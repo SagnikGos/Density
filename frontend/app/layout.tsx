@@ -22,8 +22,15 @@ const ptSans = PT_Sans({
 
 // Metadata for the application (SEO and browser information)
 export const metadata: Metadata = {
-  title: "Your Blogging Platform", // Update with your app's title
-  description: "A feature-rich blogging platform built with Next.js.", // Update description
+  title: "Density", // Update with your app's title
+  description: "Densify Your Thoughts. Amplify Your Reach.",
+  //icon
+  icons: {
+    icon: "/density-favicon.png", // Path to your favicon or app icon
+    shortcut: "/density-favicon.png", // Path to a shortcut icon
+    apple: "/density-favicon.png", // Path to an Apple touch icon
+  },
+  // Update description
   // Add other metadata like icons, open graph tags, etc.
 };
 

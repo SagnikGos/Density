@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Heart, MessageCircle, Send, Loader2, AlertCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 
-// Interfaces
+// Interfaces (assuming these are defined as you provided)
 interface Author {
   _id: string;
   username: string;
@@ -28,7 +28,7 @@ interface Post {
   content: string;
   tags: string[];
   authorId: Author;
-  likes: string[]; // Array of user IDs who liked the post
+  likes: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -49,10 +49,9 @@ interface Comment {
   updatedAt: string;
 }
 
-// Define a type for the session user if you customize it extensively
 interface SessionUser extends Record<string, unknown> {
-    id?: string; // This will hold the MongoDB _id
-    userId?: string; // This was the previous attempt, keep if backendToken decodes to this
+    id?: string;
+    userId?: string;
     backendToken?: string;
     name?: string | null;
     email?: string | null;
@@ -76,23 +75,18 @@ const SinglePostPage = () => {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
 
-  // State for Like Feature
   const [hasLikedPost, setHasLikedPost] = useState(false);
   const [currentLikeCount, setCurrentLikeCount] = useState(0);
   const [isLikingPost, setIsLikingPost] = useState(false);
 
-  // Correctly derive currentUserId from session.user.id as per NextAuth config
   const typedSessionUser = session?.user as SessionUser | undefined;
-  const currentUserId = typedSessionUser?.id; // Use .id
+  const currentUserId = typedSessionUser?.id;
   const backendToken = typedSessionUser?.backendToken;
 
-
-  // Effect to initialize like state when post and session are loaded
   useEffect(() => {
     if (post && sessionStatus === 'authenticated' && currentUserId) {
       setHasLikedPost(post.likes.includes(currentUserId));
     } else if (post && sessionStatus !== 'loading' && !currentUserId) {
-      // If session loaded and no user, they haven't liked it.
       setHasLikedPost(false);
     }
     if (post) {
@@ -100,8 +94,6 @@ const SinglePostPage = () => {
     }
   }, [post, sessionStatus, currentUserId]);
 
-
-  // Fetch Post Data
   useEffect(() => {
     if (!slug) {
       setIsLoading(true);
@@ -119,14 +111,11 @@ const SinglePostPage = () => {
         }
         const data: Post = await response.json();
         setPost(data);
-        // Initialize likes here too, as post data is now available
         setCurrentLikeCount(data.likes?.length || 0);
-        // Re-check currentUserId as session might have loaded by now
         const sessionUserId = (session?.user as SessionUser | undefined)?.id;
         if (sessionStatus === 'authenticated' && sessionUserId) {
             setHasLikedPost(data.likes.includes(sessionUserId));
         }
-
       } catch (err: any) {
         setError(err.message || 'An unexpected error occurred while fetching the post.');
         console.error(`Error fetching post with slug "${slug}":`, err);
@@ -135,9 +124,8 @@ const SinglePostPage = () => {
       }
     };
     fetchPostDetails();
-  }, [slug, sessionStatus, session]); // session dependency to re-evaluate likes if session changes
+  }, [slug, sessionStatus, session]);
 
-  // Fetch Comments
   const fetchCommentsForPost = async (postId: string) => {
     setIsFetchingComments(true);
     try {
@@ -164,15 +152,12 @@ const SinglePostPage = () => {
     }
   }, [post?._id]);
 
-
-  // Handle Adding a New Comment
   const handleAddComment = async (e: FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) {
       setCommentError("Comment cannot be empty.");
       return;
     }
-    // Use currentUserId and backendToken derived at component scope
     if (sessionStatus !== 'authenticated' || !currentUserId) {
       setCommentError("You must be logged in to comment.");
       return;
@@ -213,25 +198,13 @@ const SinglePostPage = () => {
     }
   };
 
-  // Handle Liking/Unliking a Post
   const handleLikeToggle = async () => {
-    // Log values at the beginning of the handler
-    console.log("[handleLikeToggle] Clicked!");
-    console.log("[handleLikeToggle] sessionStatus:", sessionStatus);
-    console.log("[handleLikeToggle] currentUserId (from session.user.id):", currentUserId);
-    console.log("[handleLikeToggle] backendToken available:", !!backendToken);
-    console.log("[handleLikeToggle] Is post loaded?:", !!post);
-
     if (sessionStatus !== 'authenticated' || !currentUserId || !post) {
       setCommentError("You must be logged in to like a post.");
-      if (sessionStatus !== 'authenticated') console.log("Reason for like error: sessionStatus is not 'authenticated'");
-      if (!currentUserId) console.log("Reason for like error: currentUserId is falsy. Check session.user.id in NextAuth callbacks.");
-      if (!post) console.log("Reason for like error: post is falsy");
       return;
     }
     if (!backendToken) {
       setCommentError("Authentication token is missing for like action.");
-      console.log("Reason for like error: backendToken is falsy.");
       return;
     }
 
@@ -250,40 +223,34 @@ const SinglePostPage = () => {
         },
       });
 
+      const responseBody = await response.json(); // Read body once
+
       if (!response.ok) {
-        let errorData;
-        try { errorData = await response.json(); } catch (e) { /* ignore */ }
         setHasLikedPost(originalHasLiked);
         setCurrentLikeCount(originalLikeCount);
-        const errorMessage = errorData?.message || `Failed to update like status (Status: ${response.status})`;
-        setCommentError(errorMessage); // Use a specific error state for likes if preferred
+        const errorMessage = responseBody?.message || `Failed to update like status (Status: ${response.status})`;
+        setCommentError(errorMessage);
         console.error("Error toggling like (API Error):", errorMessage);
         throw new Error(errorMessage);
       }
 
-      const updatedPostData: { likes: string[] } = await response.json(); 
-      if (updatedPostData.likes) {
-        setCurrentLikeCount(updatedPostData.likes.length);
-        setHasLikedPost(updatedPostData.likes.includes(currentUserId));
+      if (responseBody.likes) {
+        setCurrentLikeCount(responseBody.likes.length);
+        setHasLikedPost(responseBody.likes.includes(currentUserId));
       }
       setCommentError(null); 
 
     } catch (error: any) {
-      // If error is not already set by the response.ok check, set it.
-      if (!commentError && error.message !== (await response.json())?.message) { // Avoid double setting from throw
-         setCommentError(error.message || 'An unexpected error occurred while liking.');
+      if (!commentError && error.message !== (post && (await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/posts/like/${post._id}`)).json())?.message) { 
+       setCommentError(error.message || 'An unexpected error occurred while liking.');
       }
       console.error("Error toggling like (Catch Block):", error);
-      // Ensure reversion if not already done
       if(hasLikedPost !== originalHasLiked) setHasLikedPost(originalHasLiked);
       if(currentLikeCount !== originalLikeCount) setCurrentLikeCount(originalLikeCount);
     } finally {
       setIsLikingPost(false);
     }
   };
-
-
-  // ----- RENDER LOGIC -----
 
   if (isLoading && !post) {
     return (
@@ -331,25 +298,125 @@ const SinglePostPage = () => {
   return (
     <>
       <style jsx global>{`
-        /* CSS Content - ensure this is valid and doesn't have parsing errors */
-        .rendered-post-content .ProseMirror { padding: 0; }
+        /* Base styles for rendered content area */
+        .rendered-post-content .ProseMirror { /* In case content comes from a raw Tiptap export */
+          padding: 0; 
+        }
+
+        /* Typography (matches editor styles) */
         .rendered-post-content h1 { font-size: 2.25rem; line-height: 1.2; font-weight: 700; margin-top: 2rem; margin-bottom: 0.75rem; letter-spacing: -0.025em; color: hsl(var(--foreground)); }
         .rendered-post-content h2 { font-size: 1.875rem; line-height: 1.25; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.5rem; letter-spacing: -0.025em; color: hsl(var(--foreground)); }
         .rendered-post-content h3 { font-size: 1.5rem; line-height: 1.3; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; letter-spacing: -0.025em; color: hsl(var(--foreground)); }
         .rendered-post-content p { font-size: 1.125rem; line-height: 1.8; margin-bottom: 1.25rem; color: hsl(var(--foreground)); font-weight: 400; }
         .rendered-post-content ul, .rendered-post-content ol { padding-left: 1.75rem; margin-bottom: 1.5rem; font-size: 1.125rem; line-height: 1.8; color: hsl(var(--foreground)); }
-        .rendered-post-content li { margin-bottom: 0.5rem; }
+        .rendered-post-content ol { list-style-type: decimal; }
+        .rendered-post-content ul { list-style-type: disc; }
+        .rendered-post-content li { margin-bottom: 0.5rem; display: list-item; } /* Ensure list item markers show */
         .rendered-post-content li > p { margin-bottom: 0.5rem; }
-        .rendered-post-content blockquote { border-left: 3px solid hsl(var(--primary)); padding-left: 1rem; margin: 1.5rem 0; font-style: italic; color: hsl(var(--muted-foreground)); background-color: hsl(var(--muted)/0.3); padding: 1rem 1rem 1rem 1.5rem; border-radius: 0.375rem; }
-        .rendered-post-content code:not(pre > code) { background-color: hsl(var(--muted)); color: hsl(var(--muted-foreground)); padding: 0.2em 0.4em; border-radius: 0.25rem; font-size: 0.9em; font-family: var(--font-mono, monospace); }
-        .rendered-post-content pre { background-color: hsl(var(--card)); color: hsl(var(--card-foreground)); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1.5rem 0; font-family: var(--font-mono, monospace); font-size: 0.95rem; border: 1px solid hsl(var(--border)); }
-        .rendered-post-content pre code { background-color: transparent !important; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+
+        /* Enhanced Blockquote Styling */
+        .rendered-post-content blockquote {
+          position: relative;
+          border-left: 4px solid hsl(var(--primary)); 
+          margin: 1.75rem 0; 
+          font-style: italic; 
+          color: hsl(var(--muted-foreground));
+          background-color: hsl(var(--muted) / 0.5); /* 50% opacity of muted for background */
+          padding: 1rem 1rem 1rem 2.5rem; /* Adjusted padding for icon */
+          border-radius: 0.375rem;
+        }
+        .rendered-post-content blockquote::before {
+          content: "“"; /* Quotation mark */
+          font-family: serif; /* For a nicer quote mark */
+          font-size: 3.5em; /* Larger quote mark */
+          color: hsl(var(--primary)/0.5); /* Primary color with opacity */
+          position: absolute;
+          left: 0.5rem;
+          top: -0.2rem; 
+          line-height: 1;
+          opacity: 0.8;
+        }
+
+        /* Inline Code Styling */
+        .rendered-post-content code:not(pre > code) { 
+          background-color: hsl(var(--muted)); 
+          color: hsl(var(--muted-foreground)); 
+          padding: 0.2em 0.4em; 
+          border-radius: 0.25rem; 
+          font-size: 0.9em;
+          font-family: var(--font-mono, monospace);
+        }
+
+        /* Enhanced Code Block (pre) Styling */
+        .rendered-post-content pre { 
+          /* Using a muted background for <pre> to distinguish from var(--card) if they are similar */
+          /* Adjust opacity based on light/dark mode needs if CSS vars don't suffice */
+          background-color: hsl(var(--muted) / 0.15); /* Default for light mode */
+          color: hsl(var(--card-foreground)); 
+          padding: 1.5rem 1.25rem; /* Slightly more padding */
+          border-radius: 0.5rem; 
+          overflow-x: auto; 
+          margin: 1.75rem 0; 
+          font-family: var(--font-mono, monospace);
+          font-size: 0.95rem;
+          border: 1px solid hsl(var(--border));
+          position: relative; /* For pseudo-element positioning */
+          border-top: 3px solid hsl(var(--primary)/0.7); /* Accent top border */
+        }
+        /* Specific dark mode styling for pre background if var(--muted) isn't enough */
+        .dark .rendered-post-content pre {
+            background-color: hsl(var(--muted) / 0.25); /* Darker muted for pre in dark mode */
+        }
+        .rendered-post-content pre::before {
+          content: 'CODE';
+          position: absolute;
+          top: 10px; /* Adjust to sit nicely above the border */
+          right: 12px;
+          font-size: 0.65rem;
+          font-weight: bold;
+          letter-spacing: 0.05em;
+          color: hsl(var(--primary));
+          background-color: hsl(var(--card)); /* Label background to match card or a specific color */
+          padding: 1px 6px;
+          border-radius: 3px;
+          border: 1px solid hsl(var(--border));
+        }
+        .rendered-post-content pre code { 
+          background-color: transparent !important; /* Important to override potential inline styles from highlighter */
+          color: inherit; 
+          padding: 0; 
+          border-radius: 0; 
+          font-size: inherit;
+        }
+        
+        /* Image Styling */
         .rendered-post-content img { max-width: 100%; height: auto; margin: 2rem auto; border-radius: 0.5rem; display: block; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
-        .rendered-post-content a { color: hsl(var(--primary)); text-decoration: none; border-bottom: 1px solid hsl(var(--primary)/0.4); transition: border-color 0.2s ease; }
-        .rendered-post-content a:hover { border-bottom: 1px solid hsl(var(--primary)); }
-        .rendered-post-content hr { border: none; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }
-        .rendered-post-content .text-left { text-align: left; } .rendered-post-content .text-center { text-align: center; } .rendered-post-content .text-right { text-align: right; } .rendered-post-content .text-justify { text-align: justify; }
-        .hljs { display: block; overflow-x: auto; } 
+        
+        /* Enhanced Link Styling */
+        .rendered-post-content a { 
+          color: hsl(var(--primary)); 
+          text-decoration: underline; /* Standard text underline */
+          text-underline-offset: 3px; /* Adjust space between text and underline */
+          transition: color 0.2s ease, text-decoration-color 0.2s ease;
+          cursor: pointer; 
+        }
+        .rendered-post-content a:hover { 
+          color: hsl(var(--primary)/0.8); /* Slightly lighten/fade color on hover */
+          text-decoration-color: hsl(var(--primary)/0.7); /* Slightly fade underline color on hover */
+          /* text-decoration-thickness: 1.5px; */ /* Thicker underline on hover - browser support can be inconsistent */
+        }
+        
+        /* Horizontal Rule Styling */
+        .rendered-post-content hr { border: none; border-top: 1px solid hsl(var(--border)); margin: 2.5rem 0; }
+
+        /* Text Alignment Classes (if Tiptap exports these) */
+        .rendered-post-content .text-left { text-align: left; } 
+        .rendered-post-content .text-center { text-align: center; } 
+        .rendered-post-content .text-right { text-align: right; } 
+        .rendered-post-content .text-justify { text-align: justify; }
+
+        /* Base for Highlight.js if used */
+        .hljs { display: block; overflow-x: auto; /* Add your highlight.js theme colors here or link a theme stylesheet */ } 
       `}</style>
 
       <article className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-3xl">
@@ -374,7 +441,7 @@ const SinglePostPage = () => {
         </header>
 
         <div
-          className="rendered-post-content prose dark:prose-invert max-w-none"
+          className="rendered-post-content prose dark:prose-invert max-w-none" // prose classes handle base typography
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 
@@ -397,7 +464,7 @@ const SinglePostPage = () => {
                 size="sm" 
                 className="hover:text-primary group px-2" 
                 onClick={handleLikeToggle} 
-                disabled={isLikingPost || sessionStatus === 'loading' || (!post && isLoading)} // Disable if post not loaded yet
+                disabled={isLikingPost || sessionStatus === 'loading' || (!post && isLoading)}
             >
               {isLikingPost ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -419,7 +486,6 @@ const SinglePostPage = () => {
               <span>{comments.length}</span><span className="ml-1 hidden xxs:inline">Comment{comments.length !== 1 ? 's' : ''}</span>
             </Button>
           </div>
-          {/* Display like-related errors if they occur and are not general comment errors */}
           {commentError && (isLikingPost || commentError.toLowerCase().includes("like")) && (
             <p className="text-destructive text-sm mt-2 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5"/>{commentError}</p>
           )}
@@ -461,7 +527,6 @@ const SinglePostPage = () => {
                 Log in to Comment
               </Button>
             )}
-            {/* Display comment submission errors if they occur and are not general or like-related errors */}
             {commentError && !isLikingPost && !commentError.toLowerCase().includes("like") && (
                 <p className="text-destructive text-sm mt-2 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5"/>{commentError}</p>
             )}
@@ -519,5 +584,5 @@ const SinglePostPage = () => {
     </>
   );
 };
- 
+  
 export default SinglePostPage;
