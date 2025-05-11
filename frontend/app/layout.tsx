@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   description: "Densify Your Thoughts. Amplify Your Reach.",
   //icon
   icons: {
-    icon: "/density-favicon.png", // Path to your favicon or app icon
+    icon: "/density-favicon.ico", // Path to your favicon or app icon
     shortcut: "/density-favicon.png", // Path to a shortcut icon
     apple: "/density-favicon.png", // Path to an Apple touch icon
   },
