@@ -1,9 +1,8 @@
-// src/components/UserAuthDisplay.tsx
-"use client"; // This is a client component
+"use client";
 
 import React from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { Button } from "@/components/ui/button"; // Assuming shadcn/ui Button
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,19 +10,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // Assuming shadcn/ui DropdownMenu
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Assuming shadcn/ui Avatar
-import { LogIn, LogOut, UserCircle, Github, ChromeIcon } from "lucide-react"; // Icons
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LogIn, LogOut, UserCircle, Github, ChromeIcon } from "lucide-react";
 
-/**
- * UserAuthDisplay component handles the presentation of authentication status and actions.
- * It shows login buttons if the user is not authenticated, or user information
- * and a logout button if they are authenticated.
- */
 const UserAuthDisplay = () => {
-  const { data: session, status } = useSession(); // Get session data and status
+  const { data: session, status } = useSession();
 
-  // Loading state while session status is being determined
   if (status === "loading") {
     return (
       <Button variant="outline" size="sm" disabled>
@@ -32,13 +25,11 @@ const UserAuthDisplay = () => {
     );
   }
 
-  // If the user is authenticated
   if (session && session.user) {
     const userName = session.user.name;
     const userEmail = session.user.email;
     const userImage = session.user.image;
 
-    // Fallback initials for Avatar if no name/image
     const getInitials = (name: string | null | undefined) => {
       if (!name) return <UserCircle className="w-5 h-5" />;
       const names = name.split(" ");
@@ -74,11 +65,7 @@ const UserAuthDisplay = () => {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {/* Add links to profile, settings, etc. here if needed */}
-          {/* <DropdownMenuItem>Profile</DropdownMenuItem> */}
-          {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
-          {/* <DropdownMenuSeparator /> */}
-          <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}> {/* Redirect to home after sign out */}
+          <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Sign out</span>
           </DropdownMenuItem>
@@ -87,15 +74,14 @@ const UserAuthDisplay = () => {
     );
   }
 
-  // If the user is not authenticated
   return (
     <div className="flex items-center space-x-2">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => signIn("google", { callbackUrl: '/' })} // Specify provider and optional callback URL
+        onClick={() => signIn("google", { callbackUrl: '/' })}
       >
-        <ChromeIcon className="mr-2 h-4 w-4" /> {/* Using a generic Chrome icon for Google */}
+        <ChromeIcon className="mr-2 h-4 w-4" />
         Sign in with Google
       </Button>
       <Button
@@ -106,13 +92,9 @@ const UserAuthDisplay = () => {
         <Github className="mr-2 h-4 w-4" />
         Sign in with GitHub
       </Button>
-      {/* You can add a general sign-in button that takes users to the default NextAuth.js sign-in page */}
-      {/* <Button variant="default" size="sm" onClick={() => signIn(undefined, { callbackUrl: '/' })}>
-        <LogIn className="mr-2 h-4 w-4" />
-        Sign In
-      </Button> */}
     </div>
   );
 };
 
 export default UserAuthDisplay;
+
