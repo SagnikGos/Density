@@ -33,22 +33,21 @@ export default function HomePage() {
         if (path) {
           tl.to(path, {
             strokeDashoffset: 0,
-            duration: 3.0, // <--- INCREASED DURATION for slower drawing of each path
+            duration: 3.0,
             ease: "power2.out",
-          }, index * 0.5); // <--- ADJUSTED STAGGER for slower overall sequence
+          }, index * 0.5);
         }
       });
 
       tl.to(pathsRef.current, {
         fill: "#603E2B",
-        duration: 1, // Optional: Slightly increase fill duration if desired
+        duration: 1,
         ease: "power2.inOut",
-        delay: 0 // Delay after all paths are drawn (relative to the end of the last stroke animation)
+        delay: 0
       });
     }
-  }, [isLoaded]); // Re-run if isLoaded changes, though primarily for initial setup
+  }, [isLoaded]);
 
-  // Function to add paths to the refs array
   const addPathRef = (el) => {
     if (el && !pathsRef.current.includes(el)) {
       pathsRef.current.push(el);
@@ -57,9 +56,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
       <section className="relative overflow-hidden py-20 md:py-32">
-        {/* Animated background elements */}
         <div className="absolute inset-0 -z-10 opacity-20 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 opacity-70" />
           <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-amber-200 opacity-20 animate-float1" />
@@ -81,24 +78,19 @@ export default function HomePage() {
               isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
             }`}
           >
-            {/* SVG Logo with GSAP animation */}
             <div className="pb-2 flex justify-center">
-              <div className="drop-shadow-lg w-full max-w-md"> {/* Adjust max-w-md as needed for new logo size */}
+              <div className="drop-shadow-lg w-full max-w-md">
                 <svg 
                   ref={svgRef}
                   version="1.0" 
                   xmlns="http://www.w3.org/2000/svg"
-                  width="100%" // Let the container control the width
-                  height="100%" // Let the container control the height
-                  viewBox="0 0 1024 420" // Adjusted viewBox from your SVG
+                  width="100%"
+                  height="100%"
+                  viewBox="0 0 1024 420"
                   preserveAspectRatio="xMidYMid meet"
-                  className="w-full" // Ensures it takes the width of the parent div
+                  className="w-full"
                 >
-                  {/* DOCTYPE and xml declaration are not part of JSX for SVG */}
-                  <g transform="translate(0.000000,420.000000) scale(0.100000,-0.100000)"
-                     /* fill="#000000" // Fill will be handled by GSAP on paths
-                     stroke="none" // Stroke will be handled by GSAP on paths */
-                  >
+                  <g transform="translate(0.000000,420.000000) scale(0.100000,-0.100000)">
                     <path 
                       ref={addPathRef}
                       stroke="#000000" 

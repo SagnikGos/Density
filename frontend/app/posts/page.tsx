@@ -9,11 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Heart, MessageCircle } from 'lucide-react';
 
-// Define an interface for the Post structure, including author details
 interface Author {
   _id: string;
   username: string;
-  name?: string; // Full name from OAuth
+  name?: string;
   avatar?: string;
 }
 
@@ -21,24 +20,20 @@ interface Post {
   _id: string;
   title: string;
   slug: string;
-  content: string; // HTML content from TipTap
+  content: string;
   tags: string[];
-  authorId: Author; // Ensure backend populates this object
-  likes: string[]; // Array of user IDs
-  commentsCount?: number; // IMPORTANT: Backend must provide this count for each post
+  authorId: Author;
+  likes: string[];
+  commentsCount?: number;
   createdAt: string;
   updatedAt: string;
 }
 
-/**
- * Utility function to strip HTML tags from a string and return plain text.
- */
 const stripHtml = (html: string): string => {
   if (typeof window !== 'undefined') {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || "";
   }
-  // Fallback for non-browser environments (should not be hit in "use client")
   return html.replace(/<[^>]+>/g, ''); 
 };
 
@@ -190,8 +185,7 @@ const AllPostsPage = () => {
                 {post.plainTextSnippet}
               </p>
             </CardContent>
-            {/* CardFooter: Removed explicit light-mode background (bg-slate-50). It will inherit or use dark mode setting. */}
-            {/* For dark mode, it was dark:bg-slate-800/30. You can adjust this as needed. */}
+          
             <CardFooter className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 pb-4 border-t dark:bg-slate-800/30 px-5">
                 <div className="flex flex-wrap gap-1.5">
                   {post.tags && post.tags.length > 0 && post.tags.slice(0, 2).map((tag) => (
@@ -212,7 +206,7 @@ const AllPostsPage = () => {
                     </div>
                     <div className="flex items-center" title={`${post.commentsCount || 0} comments`}>
                         <MessageCircle className="h-3.5 w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
-                        {/* IMPORTANT: Ensure your backend API (/api/posts) returns 'commentsCount' for each post. */}
+                       
                         <span>{post.commentsCount || 0}</span>
                     </div>
                 </div>
@@ -225,3 +219,4 @@ const AllPostsPage = () => {
 };
 
 export default AllPostsPage;
+
