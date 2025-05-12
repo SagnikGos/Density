@@ -2,14 +2,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import UserAuthDisplay from "./UserAuthDisplay";
+import UserAuthDisplay from "./UserAuthDisplay"; // Ensure this path is correct
 import {
   NewspaperIcon,
   PencilSquareIcon,
   Bars3Icon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
-import { motion, AnimatePresence } from "framer-motion"; // Import motion and AnimatePresence
+import { motion, AnimatePresence } from "framer-motion";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -18,11 +18,14 @@ const Header = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Animation variants for the mobile menu
+  const closeMobileMenuOnly = () => {
+    setIsMobileMenuOpen(false);
+  }
+
   const mobileMenuVariants = {
     hidden: {
       opacity: 0,
-      y: -20, // Start slightly above and fade in
+      y: -20,
       transition: { duration: 0.2, ease: "easeInOut" }
     },
     visible: {
@@ -32,7 +35,7 @@ const Header = () => {
     },
     exit: {
       opacity: 0,
-      y: -20, // Exit by sliding up and fading out
+      y: -20,
       transition: { duration: 0.2, ease: "easeInOut" }
     }
   };
@@ -41,9 +44,9 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container relative flex h-16 max-w-screen-2xl items-center justify-between px-4 md:px-6">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center space-x-2" onClick={closeMobileMenuOnly}>
           <Image
-            src="/density-logo.png"
+            src="/density-logo.png" // Make sure this path is correct in your public folder
             alt="Density Logo"
             width={80}
             height={20}
@@ -55,7 +58,7 @@ const Header = () => {
         {/* Mobile Menu Toggle */}
         <button
           onClick={toggleMobileMenu}
-          className="md:hidden absolute right-4 z-60" // z-index should be high enough
+          className="md:hidden absolute right-4 z-60" // Increased z-index for toggle
           aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
         >
           {isMobileMenuOpen ? (
@@ -83,7 +86,7 @@ const Header = () => {
               Write
             </Link>
           </nav>
-          <UserAuthDisplay />
+          <UserAuthDisplay /> {/* For Desktop */}
         </div>
 
         {/* Mobile Navigation Overlay */}
@@ -94,27 +97,29 @@ const Header = () => {
               animate="visible"
               exit="exit"
               variants={mobileMenuVariants}
-              className="md:hidden absolute top-full left-0 w-full bg-background shadow-lg" // Ensure this is positioned correctly
+              className="md:hidden absolute top-full left-0 w-full bg-background shadow-lg z-50" // z-index for overlay
             >
-              <div className="flex flex-col p-4 space-y-2">
+              <div className="flex flex-col p-4 space-y-3 max-h-[calc(100vh-4rem)] overflow-y-auto">
                 <Link
                   href="/posts"
-                  onClick={toggleMobileMenu}
-                  className="flex items-center p-3 rounded-md hover:bg-accent"
+                  onClick={toggleMobileMenu} // Close menu on navigation
+                  className="flex items-center p-3 rounded-md hover:bg-accent text-foreground/90"
                 >
-                  <NewspaperIcon className="mr-3 h-6 w-6" />
-                  Posts
+                  <NewspaperIcon className="mr-3 h-6 w-6 flex-shrink-0" />
+                  <span className="truncate">Posts</span>
                 </Link>
                 <Link
                   href="/create-post"
-                  onClick={toggleMobileMenu}
+                  onClick={toggleMobileMenu} // Close menu on navigation
                   className="flex items-center p-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  <PencilSquareIcon className="mr-3 h-6 w-6" />
-                  Write
+                  <PencilSquareIcon className="mr-3 h-6 w-6 flex-shrink-0" />
+                  <span className="truncate">Write</span>
                 </Link>
+                <hr className="border-border/40 my-2" />
                 <div className="pt-2">
-                  <UserAuthDisplay />
+                  {/* Pass isMobile and closeMobileMenu props */}
+                  <UserAuthDisplay isMobile={true} closeMobileMenu={toggleMobileMenu} />
                 </div>
               </div>
             </motion.div>
