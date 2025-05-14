@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
@@ -14,6 +15,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Typography from '@tiptap/extension-typography';
 import TextAlign from '@tiptap/extension-text-align';
 import { useTheme } from 'next-themes';
+import { Mark, mergeAttributes, RawCommands } from '@tiptap/core';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Import createLowlight and individual languages
 import { createLowlight } from 'lowlight';
@@ -29,7 +32,7 @@ import php from 'highlight.js/lib/languages/php';
 import {
   Bold, Italic, Strikethrough, Code, Pilcrow, List, ListOrdered, Quote, Link as LinkIcon,
   Image as ImageIcon, Code2, Undo, Redo, Minus, Clock, AlignLeft, AlignCenter, AlignRight,
-  Heading1, Heading2, Heading3, Save, Eye, ExternalLink, X, UploadCloud
+  Heading1, Heading2, Heading3, Save, Eye, ExternalLink, X, UploadCloud, Info
 } from 'lucide-react';
 
 // Create a lowlight instance
@@ -147,15 +150,159 @@ const LinkModal: React.FC<LinkModalProps> = ({
   );
 };
 
+// Add interface for InfoNoteModal
+interface InfoNoteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+  initialNote?: string;
+}
+
+// Update InfoNote extension to be a proper Mark extension
+const InfoNote = Mark.create({
+  name: 'infoNote',
+  addAttributes() {
+    return {
+      note: {
+        default: '',
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-note'),
+        renderHTML: (attributes: { note: string }) => {
+          return mergeAttributes(
+            { 'data-note': attributes.note },
+            { class: 'info-note', role: 'button', tabIndex: 0 }
+          )
+        },
+      },
+    }
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-note]',
+      },
+    ]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0]
+  },
+  addCommands() {
+    return {
+      setInfoNote: (note: string) => ({ commands }: { commands: RawCommands }) => {
+        return commands.setMark(this.name, { note })
+      },
+      unsetInfoNote: () => ({ commands }: { commands: RawCommands }) => {
+        return commands.unsetMark(this.name)
+      },
+    } as Partial<RawCommands>
+  },
+});
+
+// Update InfoNoteModal with proper event type
+const InfoNoteModal: React.FC<InfoNoteModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialNote = '',
+}) => {
+  const [note, setNote] = useState(initialNote);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNote(initialNote);
+      setTimeout(() => noteInputRef.current?.focus(), 50);
+    }
+  }, [isOpen, initialNote]);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    onSubmit(note);
+    onClose();
+  };
+
+  const handleCancel = () => {
+    onSubmit(''); // Pass empty string to remove the note
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-card p-6 rounded-lg shadow-xl w-full max-w-md border border-border">
+        <form onSubmit={handleSubmit}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-foreground">
+              {initialNote ? 'Edit Note' : 'Add Note'}
+            </h3>
+            <Button type="button" variant="ghost" size="icon" onClick={handleCancel} className="text-muted-foreground">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="note-content" className="block text-sm font-medium text-muted-foreground mb-1">Note</label>
+              <Textarea
+                ref={noteInputRef}
+                id="note-content"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Add a note that will appear on hover..."
+                className="w-full min-h-[100px]"
+              />
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end space-x-3">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {initialNote && note.trim() === '' ? 'Remove Note' : 'Save Note'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Update InfoNoteDialog component with better text wrapping
+const InfoNoteDialog = ({ isOpen, onClose, note }: { isOpen: boolean; onClose: () => void; note: string }) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Note</DialogTitle>
+        </DialogHeader>
+        <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+          <div className="text-sm text-foreground whitespace-pre-wrap break-all overflow-hidden">
+            <div className="w-full break-words leading-relaxed">
+              {note}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const TipTapMenuBar = ({ editor }: { editor: any }) => {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isInfoNoteModalOpen, setIsInfoNoteModalOpen] = useState(false);
   const [linkModalData, setLinkModalData] = useState<{ initialUrl: string; initialText: string; isTextSelected: boolean }>({
     initialUrl: '',
     initialText: '',
     isTextSelected: false,
   });
+  const [infoNoteData, setInfoNoteData] = useState<{ initialNote: string }>({
+    initialNote: '',
+  });
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [infoNoteDialog, setInfoNoteDialog] = useState<{ isOpen: boolean; note: string }>({
+    isOpen: false,
+    note: '',
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
 
@@ -199,6 +346,27 @@ const TipTapMenuBar = ({ editor }: { editor: any }) => {
       editor.chain().focus().extendMarkRange('link').setLink(linkAttributes).run();
     }
     setIsLinkModalOpen(false);
+  }, [editor]);
+
+  const openInfoNoteModal = useCallback(() => {
+    const existingAttributes = editor.getAttributes('infoNote');
+    const { selection } = editor.state;
+    const selectedText = selection.empty ? '' : editor.state.doc.textBetween(selection.from, selection.to, ' ');
+
+    setInfoNoteData({
+      initialNote: existingAttributes.note || '',
+    });
+    setIsInfoNoteModalOpen(true);
+  }, [editor]);
+
+  const handleInfoNoteModalSubmit = useCallback((note: string) => {
+    if (note === '' || editor.isActive('infoNote')) {
+      editor.chain().focus().extendMarkRange('infoNote').unsetInfoNote().run();
+      return;
+    }
+
+    editor.chain().focus().extendMarkRange('infoNote').setInfoNote(note).run();
+    setIsInfoNoteModalOpen(false);
   }, [editor]);
 
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,6 +419,26 @@ const TipTapMenuBar = ({ editor }: { editor: any }) => {
   const activeClasses = "bg-primary/10 text-primary hover:bg-primary/20";
   const inactiveClasses = "text-foreground/70 hover:text-foreground hover:bg-muted/60";
 
+  // Add click handler for info notes
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleInfoNoteClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains('info-note')) {
+        const note = target.getAttribute('data-note');
+        if (note) {
+          setInfoNoteDialog({ isOpen: true, note });
+        }
+      }
+    };
+
+    editor.view.dom.addEventListener('click', handleInfoNoteClick);
+    return () => {
+      editor.view.dom.removeEventListener('click', handleInfoNoteClick);
+    };
+  }, [editor]);
+
   return (
     <>
       <LinkModal
@@ -260,6 +448,12 @@ const TipTapMenuBar = ({ editor }: { editor: any }) => {
         initialUrl={linkModalData.initialUrl}
         initialText={linkModalData.initialText}
         isTextSelected={linkModalData.isTextSelected}
+      />
+      <InfoNoteModal
+        isOpen={isInfoNoteModalOpen}
+        onClose={() => setIsInfoNoteModalOpen(false)}
+        onSubmit={handleInfoNoteModalSubmit}
+        initialNote={infoNoteData.initialNote}
       />
       {/* Hidden file input for image uploads */}
       <input
@@ -314,12 +508,21 @@ const TipTapMenuBar = ({ editor }: { editor: any }) => {
         >
           {isUploadingImage ? <UploadCloud className="h-4 w-4 animate-pulse" /> : <ImageIcon className="h-4 w-4" />}
         </Button>
+        <div className="h-6 border-l border-border/60 mx-1"></div>
+        <Button variant="ghost" size="icon" onClick={openInfoNoteModal} className={`${buttonClasses} ${editor.isActive('infoNote') ? activeClasses : inactiveClasses}`}>
+          <Info className="h-4 w-4" />
+        </Button>
       </div>
       {imageUploadError && (
         <div className="p-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md mb-2 mx-2">
           Image Upload Error: {imageUploadError}
         </div>
       )}
+      <InfoNoteDialog
+        isOpen={infoNoteDialog.isOpen}
+        onClose={() => setInfoNoteDialog({ isOpen: false, note: '' })}
+        note={infoNoteDialog.note}
+      />
     </>
   );
 };
@@ -353,14 +556,17 @@ const EditorStats = ({ editor }: { editor: any }) => {
 const CreatePostPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { theme } = useTheme(); // Assuming you might use this for styling later
-
+  const { theme } = useTheme();
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [infoNoteDialog, setInfoNoteDialog] = useState<{ isOpen: boolean; note: string }>({
+    isOpen: false,
+    note: '',
+  });
 
   const editor = useEditor({
     extensions: [
@@ -380,14 +586,17 @@ const CreatePostPage = () => {
       }),
       ImageExtension.configure({
         inline: false,
-        allowBase64: false, // Important: disable base64 if uploading to Cloudinary
+        allowBase64: false,
         HTMLAttributes: {
-          class: 'uploaded-image', // Add a class for styling if needed
+          class: 'uploaded-image',
         },
       }),
       CodeBlockLowlight.configure({
         lowlight,
         defaultLanguage: 'javascript',
+        HTMLAttributes: {
+          class: 'code-block',
+        },
       }),
       Placeholder.configure({
         placeholder: 'Tell your story...',
@@ -397,6 +606,7 @@ const CreatePostPage = () => {
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
+      InfoNote,
     ],
     content: '',
     editorProps: {
@@ -404,7 +614,23 @@ const CreatePostPage = () => {
         class: 'focus:outline-none min-h-[400px] w-full prose dark:prose-invert max-w-none',
       },
     },
-    immediatelyRender: false, // Set to false to improve initial load if editor is complex
+    onUpdate: ({ editor }) => {
+      // Add click handler for info notes
+      const handleInfoNoteClick = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        if (target.classList.contains('info-note')) {
+          const note = target.getAttribute('data-note');
+          if (note) {
+            setInfoNoteDialog({ isOpen: true, note });
+          }
+        }
+      };
+
+      editor.view.dom.addEventListener('click', handleInfoNoteClick);
+      return () => {
+        editor.view.dom.removeEventListener('click', handleInfoNoteClick);
+      };
+    },
   });
 
   useEffect(() => {
@@ -572,17 +798,16 @@ const CreatePostPage = () => {
           font-family: var(--font-mono, monospace);
         }
         .ProseMirror pre {
-          background-color: hsl(var(--card)); /* Use card background, can be themed */
-          color: hsl(var(--card-foreground));
-          padding: 1.5rem 1.25rem; /* Slightly more padding */
-          border-radius: 0.5rem;
-          overflow-x: auto;
-          margin: 1.75rem 0;
-          font-family: var(--font-mono, monospace);
-          font-size: 0.95rem;
-          border: 1px solid #a0522d; /* Brown border for better UI/UX */
-          position: relative;
-          border-top: 3px solid hsl(var(--primary)/70);
+          background-color: hsl(var(--card)) !important;
+          color: hsl(var(--card-foreground)) !important;
+          padding: 1.5rem 1.25rem !important;
+          border-radius: 0.5rem !important;
+          overflow-x: auto !important;
+          margin: 1.75rem 0 !important;
+          font-family: var(--font-mono, monospace) !important;
+          font-size: 0.95rem !important;
+          border: 3px solid #61450F !important;
+          position: relative !important;
         }
          .ProseMirror pre::before {
           content: attr(data-language) 'CODE'; /* Display language if available */
@@ -629,6 +854,118 @@ const CreatePostPage = () => {
         .title-input-custom:focus-visible, .tags-input-custom:focus-visible { border-color: hsl(var(--primary)) !important; box-shadow: 0 0 0 1px hsl(var(--primary)) !important; }
 
         .preview-mode { padding: 1.5rem; border-radius: 0.5rem; }
+
+        /* Dark mode specific styles */
+        .dark .ProseMirror pre {
+          border-color: #D2691E !important; /* Lighter brown for dark mode */
+          box-shadow: 0 4px 6px rgba(210, 105, 30, 0.3) !important;
+          background-color: hsl(var(--muted) / 0.25) !important; /* Darker background for dark mode */
+        }
+
+        /* Override Tailwind Typography styles */
+        .prose pre,
+        .prose-invert pre,
+        .dark .prose pre,
+        .dark .prose-invert pre {
+          border: 3px solid #8B4513 !important;
+          box-shadow: 0 4px 6px rgba(139, 69, 19, 0.2) !important;
+        }
+
+        .dark .prose pre,
+        .dark .prose-invert pre {
+          border-color: #D2691E !important;
+          box-shadow: 0 4px 6px rgba(210, 105, 30, 0.3) !important;
+        }
+
+        /* Code block styles */
+        .code-block,
+        .ProseMirror pre,
+        .prose pre,
+        .prose-invert pre,
+        .rendered-post-content pre {
+          background-color: hsl(var(--card)) !important;
+          color: hsl(var(--card-foreground)) !important;
+          padding: 1.5rem 1.25rem !important;
+          border-radius: 0.5rem !important;
+          overflow-x: auto !important;
+          margin: 1.75rem 0 !important;
+          font-family: var(--font-mono, monospace) !important;
+          font-size: 0.95rem !important;
+          border: 3px solid #61450F !important;
+          position: relative !important;
+        }
+
+        /* Dark mode styles */
+        .dark .code-block,
+        .dark .ProseMirror pre,
+        .dark .prose pre,
+        .dark .prose-invert pre,
+        .dark .rendered-post-content pre {
+          background-color: hsl(var(--muted) / 0.25) !important;
+          border-color: #61450F !important;
+        }
+
+        /* Override any Tailwind Typography styles */
+        .prose pre,
+        .prose-invert pre,
+        .dark .prose pre,
+        .dark .prose-invert pre {
+          background-color: hsl(var(--card)) !important;
+          border: 3px solid #61450F !important;
+        }
+
+        .dark .prose pre,
+        .dark .prose-invert pre {
+          background-color: hsl(var(--muted) / 0.25) !important;
+          border-color: #61450F !important;
+        }
+
+        /* Info Note Styles */
+        .info-note {
+          border-bottom: 2px dotted hsl(var(--primary));
+          cursor: pointer;
+          position: relative;
+          padding: 0.1em 0.3em;
+          border-radius: 0.15em;
+          transition: all 0.2s ease;
+          background-color: hsl(var(--primary) / 0.05);
+          color: hsl(var(--primary));
+          font-weight: 500;
+          display: inline-block;
+          margin: 0 0.1em;
+        }
+        .info-note:hover {
+          border-bottom-color: hsl(var(--primary) / 0.7);
+          background-color: hsl(var(--primary) / 0.1);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px hsl(var(--primary) / 0.1);
+        }
+        .info-note:active {
+          transform: translateY(0);
+          box-shadow: none;
+        }
+        .info-note:focus {
+          outline: 2px solid hsl(var(--primary) / 0.5);
+          outline-offset: 2px;
+        }
+        .info-note:focus:not(:focus-visible) {
+          outline: none;
+        }
+        .info-note::after {
+          content: "i";
+          position: absolute;
+          top: 0.1em;
+          right: -0.1em;
+          font-style: italic;
+          font-weight: bold;
+          font-size: 0.75em;
+          opacity: 0.7;
+          transition: opacity 0.2s ease;
+          line-height: 1;
+        }
+        .info-note:hover::after {
+          opacity: 1;
+        }
       `}</style>
 
       {/* Editor Header with Actions */}
