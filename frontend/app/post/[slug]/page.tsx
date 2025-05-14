@@ -59,7 +59,6 @@ interface SessionUser extends Record<string, unknown> {
     image?: string | null;
 }
 
-
 const SinglePostPage = () => {
   const params = useParams();
   const router = useRouter();
