@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Heart, MessageCircle, Send, Loader2, AlertCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Interfaces (assuming these are defined as you provided)
 interface Author {
@@ -78,6 +79,11 @@ const SinglePostPage = () => {
   const [hasLikedPost, setHasLikedPost] = useState(false);
   const [currentLikeCount, setCurrentLikeCount] = useState(0);
   const [isLikingPost, setIsLikingPost] = useState(false);
+
+  const [infoNoteDialog, setInfoNoteDialog] = useState<{ isOpen: boolean; note: string }>({
+    isOpen: false,
+    note: '',
+  });
 
   const typedSessionUser = session?.user as SessionUser | undefined;
   const currentUserId = typedSessionUser?.id;
@@ -252,6 +258,24 @@ const SinglePostPage = () => {
     }
   };
 
+  // Add click handler for info notes
+  useEffect(() => {
+    const handleInfoNoteClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains('info-note')) {
+        const note = target.getAttribute('data-note');
+        if (note) {
+          setInfoNoteDialog({ isOpen: true, note });
+        }
+      }
+    };
+
+    document.addEventListener('click', handleInfoNoteClick);
+    return () => {
+      document.removeEventListener('click', handleInfoNoteClick);
+    };
+  }, []);
+
   if (isLoading && !post) {
     return (
       <div className="container mx-auto px-4 py-12">
@@ -349,44 +373,37 @@ const SinglePostPage = () => {
 
         /* Enhanced Code Block (pre) Styling */
         .rendered-post-content pre { 
-          /* Using a muted background for <pre> to distinguish from var(--card) if they are similar */
-          /* Adjust opacity based on light/dark mode needs if CSS vars don't suffice */
-          background-color: hsl(var(--muted) / 0.15); /* Default for light mode */
-          color: hsl(var(--card-foreground)); 
-          padding: 1.5rem 1.25rem; /* Slightly more padding */
-          border-radius: 0.5rem; 
-          overflow-x: auto; 
-          margin: 1.75rem 0; 
-          font-family: var(--font-mono, monospace);
-          font-size: 0.95rem;
-          border: 1px solid hsl(var(--border));
-          position: relative; /* For pseudo-element positioning */
-          border-top: 3px solid hsl(var(--primary)/0.7); /* Accent top border */
+          background-color: hsl(var(--card)) !important;
+          color: hsl(var(--card-foreground)) !important;
+          padding: 1.5rem 1.25rem !important;
+          border-radius: 0.5rem !important;
+          overflow-x: auto !important;
+          margin: 1.75rem 0 !important;
+          font-family: var(--font-mono, monospace) !important;
+          font-size: 0.95rem !important;
+          border: 3px solid #61450F !important;
+          position: relative !important;
         }
-        /* Specific dark mode styling for pre background if var(--muted) isn't enough */
+
+        /* Dark mode styles */
         .dark .rendered-post-content pre {
-            background-color: hsl(var(--muted) / 0.25); /* Darker muted for pre in dark mode */
+          background-color: hsl(var(--muted) / 0.25) !important;
+          border-color: #61450F !important;
         }
+
         .rendered-post-content pre::before {
           content: 'CODE';
           position: absolute;
-          top: 10px; /* Adjust to sit nicely above the border */
+          top: 10px;
           right: 12px;
           font-size: 0.65rem;
           font-weight: bold;
           letter-spacing: 0.05em;
           color: hsl(var(--primary));
-          background-color: hsl(var(--card)); /* Label background to match card or a specific color */
+          background-color: hsl(var(--card));
           padding: 1px 6px;
           border-radius: 3px;
           border: 1px solid hsl(var(--border));
-        }
-        .rendered-post-content pre code { 
-          background-color: transparent !important; /* Important to override potential inline styles from highlighter */
-          color: inherit; 
-          padding: 0; 
-          border-radius: 0; 
-          font-size: inherit;
         }
         
         /* Image Styling */
@@ -417,6 +434,53 @@ const SinglePostPage = () => {
 
         /* Base for Highlight.js if used */
         .hljs { display: block; overflow-x: auto; /* Add your highlight.js theme colors here or link a theme stylesheet */ } 
+
+        /* Info Note Styles */
+        .info-note {
+          border-bottom: 2px dotted hsl(var(--primary));
+          cursor: pointer;
+          position: relative;
+          padding: 0.1em 0.3em;
+          border-radius: 0.15em;
+          transition: all 0.2s ease;
+          background-color: hsl(var(--primary) / 0.05);
+          color: hsl(var(--primary));
+          font-weight: 500;
+          display: inline-block;
+          margin: 0 0.1em;
+        }
+        .info-note:hover {
+          border-bottom-color: hsl(var(--primary) / 0.7);
+          background-color: hsl(var(--primary) / 0.1);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px hsl(var(--primary) / 0.1);
+        }
+        .info-note:active {
+          transform: translateY(0);
+          box-shadow: none;
+        }
+        .info-note:focus {
+          outline: 2px solid hsl(var(--primary) / 0.5);
+          outline-offset: 2px;
+        }
+        .info-note:focus:not(:focus-visible) {
+          outline: none;
+        }
+        .info-note::after {
+          content: "i";
+          position: absolute;
+          top: 0.1em;
+          right: -0.1em;
+          font-style: italic;
+          font-weight: bold;
+          font-size: 0.75em;
+          opacity: 0.7;
+          transition: opacity 0.2s ease;
+          line-height: 1;
+        }
+        .info-note:hover::after {
+          opacity: 1;
+        }
       `}</style>
 
       <article className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-3xl">
@@ -581,8 +645,33 @@ const SinglePostPage = () => {
           </div>
         </section>
       </article>
+      <InfoNoteDialog
+        isOpen={infoNoteDialog.isOpen}
+        onClose={() => setInfoNoteDialog({ isOpen: false, note: '' })}
+        note={infoNoteDialog.note}
+      />
     </>
   );
 };
-  
+
+// Add InfoNoteDialog component
+const InfoNoteDialog = ({ isOpen, onClose, note }: { isOpen: boolean; onClose: () => void; note: string }) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Note</DialogTitle>
+        </DialogHeader>
+        <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+          <div className="text-sm text-foreground whitespace-pre-wrap break-all overflow-hidden">
+            <div className="w-full break-words leading-relaxed">
+              {note}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default SinglePostPage;
