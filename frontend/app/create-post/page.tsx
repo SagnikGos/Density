@@ -580,7 +580,7 @@ const CreatePostPage = () => {
           margin: 1.75rem 0;
           font-family: var(--font-mono, monospace);
           font-size: 0.95rem;
-          border: 1px solid hsl(var(--border));
+          border: 1px solid #a0522d; /* Brown border for better UI/UX */
           position: relative;
           border-top: 3px solid hsl(var(--primary)/70);
         }
